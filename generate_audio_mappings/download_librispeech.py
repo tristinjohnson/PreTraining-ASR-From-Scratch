@@ -1,17 +1,18 @@
 import os
 import argparse
 
+# get the data split
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_dir_name', required=True, help='the name of the folder in which to download LibriSpeech. Ex: \'Data\'')
+parser.add_argument('--split', required=True, help='which dataset to download: [dev, train-clean-100, train-clean-360, test]')
+args = parser.parse_args()
+
 # make a new data directory
-os.makedirs('../../data_test')
-data_dir = '../../data_test/'
+os.makedirs('../' + args.data_dir_name)
+data_dir = '../' + args.data_dir_name + '/'
 
 # change to data directory
 os.chdir(data_dir)
-
-# get the data split
-parser = argparse.ArgumentParser()
-parser.add_argument('--split', required=True, help='which dataset to download: [dev, train-clean-100, train-clean-360, test]')
-args = parser.parse_args()
 
 # if 'dev' or validation split
 if args.split == 'dev':
