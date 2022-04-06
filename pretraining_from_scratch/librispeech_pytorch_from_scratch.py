@@ -1,29 +1,29 @@
-import random
+# import various python packages
 import pandas as pd
-import numpy as np
 import re
-import json
 from transformers import Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2ForCTC
-from transformers import Wav2Vec2Config, Wav2Vec2Model
+from transformers import Wav2Vec2Config
 import torch
 from torch.utils.data import Dataset, DataLoader
+from datasets import Dataset as HF_dataset
 from jiwer import wer
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
 import librosa
-from datasets import load_metric
 from tqdm import tqdm
+import argparse
+import json
 import warnings
 warnings.filterwarnings('ignore')
 
 
-# load in librispeech dev mappings, create full_path column
-librispeech = pd.read_csv('speech_paths/librispeech_train_mappings.csv')
+
+"""# load in librispeech dev mappings, create full_path column
+librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
 librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
 librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
 
-#test = librispeech[0:40]
-test = librispeech[0:15000]
+test = librispeech[0:200]"""
 
 
 # load raw audio file with sampling_rate = 16kHz
@@ -45,15 +45,61 @@ def remove_char(data):
     return data
 
 
-# load Wav2Vec2 tokenizer with custom vocab, create feature extractor, implement processor
-tokenizer = Wav2Vec2CTCTokenizer('vocab/vocab_librispeech.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
+# function to extract all characters from the text to create custom vocab
+def extract_all_chars(batch):
+    all_text = " ".join(batch['text_translation'])
+    vocab = list(set(all_text))
+
+    return {"vocab": [vocab], "all_text": [all_text]}
+
+
+def create_custom_vocab(dataset):
+    print('Creating custom vocab from Librispeech! ...')
+    librispeech_vocab = HF_dataset.from_pandas(dataset)
+
+    vocabs = librispeech_vocab.map(extract_all_chars, batched=True, batch_size=1, keep_in_memory=True)
+    vocabs_list = list(set(vocabs['vocab'][0]))
+
+    vocab_dict = {v: k for k, v in enumerate(vocabs_list)}
+
+    vocab_dict["|"] = vocab_dict[" "]
+    del vocab_dict[" "]
+
+    # doesnt include J, Q, X, Z
+    vocab_dict["J"] = len(vocab_dict)
+    vocab_dict["Q"] = len(vocab_dict)
+    vocab_dict["X"] = len(vocab_dict)
+    vocab_dict["Z"] = len(vocab_dict)
+    vocab_dict["<unk>"] = len(vocab_dict)
+    vocab_dict["<pad>"] = len(vocab_dict)
+    vocab_dict["<s>"] = len(vocab_dict)
+    vocab_dict["</s>"] = len(vocab_dict)
+    vocab_dict["'"] = len(vocab_dict)
+
+    print('Custom Vocab created: ', vocab_dict)
+    print('Length of vocab file (should be 32): ', len(vocab_dict))
+
+    with open('./custom_librispeech_vocab.json', 'w') as vocab_file:
+        json.dump(vocab_dict, vocab_file)
+
+    print('Custom vocab has been created and saved in this directory as \'custom_librispeech_vocab.json\'')
+
+
+#create_custom_vocab(librispeech)
+
+
+
+"""# load Wav2Vec2 tokenizer with custom vocab, create feature extractor, implement processor
+tokenizer = Wav2Vec2CTCTokenizer('../vocab/custom_librispeech_vocab.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
 feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
 processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
-#processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-#model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+# load Wav2Vec2 Config and Model
+#config = Wav2Vec2Config().from_pretrained('../pretraining_from_model/wav2vec_config.json')
 config = Wav2Vec2Config()
-model = Wav2Vec2ForCTC(config)
+model = Wav2Vec2ForCTC(config).cuda()
+
+model.config.architectures = ["Wav2Vec2ForCTC"]"""
 
 
 # function to extract waveform from audio, tokenize audio, and get input values for model
@@ -71,9 +117,6 @@ def prepare_dataset(data):
     return data
 
 
-#librispeech_pre = prepare_dataset(librispeech)
-
-
 # custom LibriSpeech PyTorch Dataset
 class LibriSpeechDS(Dataset):
     def __init__(self, data):
@@ -83,9 +126,6 @@ class LibriSpeechDS(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        # get files
-        #files = self.data['audio'][index]
-
         # clean the data
         cleaned_ds = remove_char(self.data)
 
@@ -142,67 +182,127 @@ class DataCollatorCTCWithPadding:
         return batch
 
 
-# get data collator with Padding
+"""# get data collator with Padding
 data_collator = DataCollatorCTCWithPadding(processor=processor)
 
 # load raw dataset into PyTorch DataLoader
 #ds_librispeech = LibriSpeechDS(librispeech)
 ds_librispeech = LibriSpeechDS(test)
-loader_libirspeech = DataLoader(ds_librispeech, batch_size=4, shuffle=False, collate_fn=data_collator)
-
-# load Wav2Vec2 config file and model
-#config = Wav2Vec2Config()
-#model = Wav2Vec2ForCTC(config)
-#processor_1 = Wav2Vec2CTCTokenizer.from_pretrained('facebook/wav2vec2-base')
-#model = Wav2Vec2ForCTC.from_pretrained('facebook/wav2vec2-base')
+loader_libirspeech = DataLoader(ds_librispeech, batch_size=batch_size, shuffle=False, collate_fn=data_collator)
 
 
 # define optimizer -> AdamW
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.00005)
-
-# put model in training mode
-model.train()
-
-# train the model
-for epoch in range(60):
-
-    total_error, total_train_steps = 0, 0
-
-    with tqdm(total=len(loader_libirspeech), desc=f'Epoch {epoch}') as pbar:
-        
-        for data in loader_libirspeech:
-            input_values = data['input_values']
-            target = data['labels']
-
-            optimizer.zero_grad()
-            output = model(input_values).logits
-            loss = model(**data).loss
-            loss.backward()
-            optimizer.step()
-
-            _, pred_ids = torch.max(output, dim=-1)
-
-            target_text = processor.batch_decode(target)
-            pred_text = processor.batch_decode(pred_ids)
-            #print('\n', pred_text, '\n')
-
-            #print('Target Text Ex: ', target_text[0])
-            #print('Pred Text Ex: ', pred_text[0])
-
-            error = wer(target_text, pred_text)
-            total_train_steps += 1
-            total_error += error
-            final_wer = total_error / total_train_steps
-
-            if total_train_steps % 10 == 0:
-                print(f'\n\nPred checkpoint at epoch: {epoch} -> steps: {total_train_steps} ---> \n{pred_text}')
-
-            pbar.update(1)
-            pbar.set_postfix_str(f'B_WER: {error:0.3f} -> T_WER: {final_wer:0.3f}')
-
-    if epoch % 5 == 0:
-        print(f'\n\n\nPred Text of last batch at epoch {epoch} --> {pred_text}')
-
-        torch.save(model.state_dict(), f'dev_wav2vec_model_{epoch}.pt')
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+ctc_loss = torch.nn.CTCLoss()"""
 
 
+def train_wav2vec_from_scratch(librispeech_ds, num_epochs, model, optimizer, processor):
+    # put model in training mode
+    model.train()
+
+    model_best_wer = 0
+
+    # train the model
+    for epoch in range(1, num_epochs + 1):
+
+        batch_wer, total_train_steps = 0, 0
+
+        with tqdm(total=len(librispeech_ds), desc=f'Epoch {epoch}') as pbar:
+
+            for data in librispeech_ds:
+                # send input_values and target labels to GPU
+                input_values = data['input_values'].cuda()
+                target = data['labels'].cuda()
+
+                data1 = {'input_values': input_values, 'labels': target}
+
+                optimizer.zero_grad()
+                output = model(input_values).logits
+                loss = model(**data1).loss
+                loss.backward()
+                optimizer.step()
+
+                # get prediction ids
+                pred_ids = torch.argmax(output, dim=-1)
+
+                # decode target and prediction
+                target_text = processor.batch_decode(target.cpu())
+                pred_text = processor.batch_decode(pred_ids.cpu())
+
+                #print('\nTARGET TEXT: ', target_text, '\nPREDICTED TEXT: ', pred_text, '\n')
+                #print('Target Text Ex: ', target_text[0])
+                #print('Pred Text Ex: ', pred_text[0])
+
+                # calculate current batch WER
+                batch_error = wer(target_text, pred_text)
+                total_train_steps += 1
+
+                # calculate overall WER
+                batch_wer += batch_error
+                total_wer = batch_wer / total_train_steps
+
+                if total_train_steps % 10 == 0:
+                    print(f'\n\nPrediction checkpoint at epoch: {epoch} and steps: {total_train_steps} ---> \n{pred_text}')
+
+                pbar.update(1)
+                pbar.set_postfix_str(f'Batch_WER: {batch_error:0.3f} -> Total_WER: {total_wer:0.3f}')
+
+        current_epoch_wer = total_wer
+
+        # if WER is greater than previous WER, save the model
+        if current_epoch_wer > model_best_wer:
+
+            torch.save(model.state_dict(), 'best_wav2vec2_model.pt')
+            print('Your model has been saved!!')
+
+
+# main
+if __name__ == '__main__':
+
+    # define arguments for training
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch_size', default=2, help='batch size')
+    parser.add_argument('--num_epochs', default=50, help='number of epochs for training')
+    parser.add_argument('--path_to_csv', required=True, help='full path to your CSV file')
+    parser.add_argument('--num_training_samples', required=True, help='number of samples for training: either any number from 0-23580 or all (all is full LibriSpeech training)')
+    args = parser.parse_args()
+
+    # load in librispeech dev mappings, create full_path column
+    #librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
+    librispeech = pd.read_csv(args.path_to_csv)
+    librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
+    librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
+
+    # create custom vocab from LibriSpeech data
+    create_custom_vocab(librispeech)
+
+    # load Wav2Vec2 tokenizer with custom vocab, create feature extractor, implement processor
+    tokenizer = Wav2Vec2CTCTokenizer('./custom_librispeech_vocab.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
+    feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
+    processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
+
+    # load Wav2Vec2 Config and Model
+    config = Wav2Vec2Config()
+    model = Wav2Vec2ForCTC(config).cuda()
+    model.config.architectures = ["Wav2Vec2ForCTC"]
+
+    # get data collator with Padding
+    data_collator = DataCollatorCTCWithPadding(processor=processor)
+
+    # define number of training samples
+    if args.num_training_samples == 'all':
+        ds_librispeech = LibriSpeechDS(librispeech)
+    else:
+        ds_librispeech = LibriSpeechDS(librispeech[0: int(args.num_training_samples)])
+
+    # load dataset into PyTorch DataLoader
+    loader_libirspeech = DataLoader(ds_librispeech, batch_size=int(args.batch_size), shuffle=False, collate_fn=data_collator)
+
+    # define optimizer -> AdamW
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
+
+    # train Wav2Vec2 on LibriSpeech
+    print(f'\nStarting training from scratch using Wav2Vec2 on Librispeech with batch_size: {args.batch_size} '
+          f'-> num_epochs: {args.num_epochs} -> num_samples: {args.num_training_samples}\n')
+
+    train_wav2vec_from_scratch(loader_libirspeech, int(args.num_epochs), model, optimizer, processor)
