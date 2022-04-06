@@ -1,7 +1,4 @@
 """
-###############################################################
-THIS IS COMPLETE: REMOVE THIS LINE WHEN UPLOADING TO GITHUB
-###############################################################
 Tristin Johnson
 March 25th, 2022
 
@@ -12,12 +9,13 @@ in order to read in audio mappings for customization.
 import pandas as pd
 import os
 from glob import glob
+import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
 
 # function to create df and excel file including audio file name, audio path, and text translation per audio
-def create_excel_audio_mappings(data_directory, data_split_name):
+def create_csv_audio_mappings(data_directory, data_split_name):
     # create empty df
     df = pd.DataFrame(columns=['audio', 'audio_path', 'text_translation']).transpose()
 
@@ -53,24 +51,25 @@ def create_excel_audio_mappings(data_directory, data_split_name):
 
     # drop NaN values, and convert text to lowercase
     df = df.dropna()
-    #df['text_translation'] = df['text_translation'].str.lower()
     df['audio_id'] = df['audio_id'].astype(int)
 
-    # export df as excel file
+    # export df as csv file
     df.to_csv(data_split_name)
 
     return df
 
 
-#dev_data_directory = '/home/ubuntu/capstone/data/LibriSpeech/dev-clean'
-dev_data_directory = '/home/ubuntu/capstone/data/LibriSpeech/train-clean-100'
-dev_data = create_excel_audio_mappings(dev_data_directory, 'librispeech_train_mappings.csv')
-print(dev_data)
-print(dev_data.iloc[-1, 0])
-print(dev_data.iloc[-1, 1])
-print(dev_data.iloc[-1, 2])
-print(type(dev_data.iloc[-1, 0]))
-print(len(dev_data))
+# get full path to dataset and customized name of csv file
+parser = argparse.ArgumentParser()
+parser.add_argument('--path', required=True, help='full path to dataset. EX: /home/ubuntu/capstone/data/LibriSpeech/dev-clean')
+parser.add_argument('--csv_name', required=True, help='provide a name to the csv file generated: EX: librispeech_train.csv')
+args = parser.parse_args()
 
-dev_data['audio_id'] = dev_data['audio_id'].astype(int)
-print(type(dev_data.iloc[-1, 0]))
+# generate csv file
+librispeech_csv = create_csv_audio_mappings(args.path, args.csv_name)
+
+# output some feedback
+print('Your custom audio mappings CSV file has been generated!\n')
+print(librispeech_csv.head())
+print('Length of dataframe: ', len(librispeech_csv))
+
