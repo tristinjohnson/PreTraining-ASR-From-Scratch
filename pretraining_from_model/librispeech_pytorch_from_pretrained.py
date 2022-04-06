@@ -21,16 +21,22 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 import librosa
 from tqdm import tqdm
+import json
 import warnings
 warnings.filterwarnings('ignore')
 
 
+batch_size = 10  # 2
+learning_rate = 0.00001
+num_epochs = 20
+
+
 # load in librispeech dev mappings, create full_path column
-librispeech = pd.read_csv('../speech_paths/librispeech_train_mappings.csv')
+librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
 librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
 librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
 
-test = librispeech[0:200]
+test = librispeech[0:5000]  # 1000
 
 
 # load raw audio file with sampling_rate = 16kHz
@@ -137,7 +143,11 @@ class DataCollatorCTCWithPadding:
 
 # load pretrained Wav2Vec2 Model and Processor
 processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").cuda()
+
+model_config = model.config.to_json_file('wav2vec_config.json')
+#with open('wav2vec2_config.json', 'w') as config:
+    #json.dump(model.config, config)
 
 # get data collator with Padding
 data_collator = DataCollatorCTCWithPadding(processor=processor)
@@ -145,53 +155,68 @@ data_collator = DataCollatorCTCWithPadding(processor=processor)
 # load raw dataset into PyTorch DataLoader
 #ds_librispeech = LibriSpeechDS(librispeech)
 ds_librispeech = LibriSpeechDS(test)
-loader_libirspeech = DataLoader(ds_librispeech, batch_size=4, shuffle=False, collate_fn=data_collator)
+loader_libirspeech = DataLoader(ds_librispeech, batch_size=batch_size, shuffle=False, collate_fn=data_collator)
 
 
 # define optimizer -> AdamW
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.00005)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
 # put model in training mode
 model.train()
 
-# train the model
-for epoch in range(60):
+model_best_wer = 0
 
-    total_error, total_train_steps = 0, 0
+# train the model
+for epoch in range(1, num_epochs+1):
+
+    total_error, total_train_steps, train_loss, total_loss = 0, 0, 0, 0
 
     with tqdm(total=len(loader_libirspeech), desc=f'Epoch {epoch}') as pbar:
         
         for data in loader_libirspeech:
-            input_values = data['input_values']
-            target = data['labels']
+            input_values = data['input_values'].cuda()
+            target = data['labels'].cuda()
+
+            data1 = {'input_values': input_values, 'labels': target}
 
             optimizer.zero_grad()
             output = model(input_values).logits
-            loss = model(**data).loss
+            loss = model(**data1).loss
             loss.backward()
             optimizer.step()
 
             _, pred_ids = torch.max(output, dim=-1)
 
-            target_text = processor.batch_decode(target)
-            pred_text = processor.batch_decode(pred_ids)
+            target_text = processor.batch_decode(target.cpu())
+            pred_text = processor.batch_decode(pred_ids.cpu())
+
+            total_train_steps += 1
+            train_loss += loss.item()
+            total_loss = train_loss / total_train_steps
 
             error = wer(target_text, pred_text)
-            total_train_steps += 1
             total_error += error
             final_wer = total_error / total_train_steps
 
-            print(pred_text)
-
-            if total_train_steps % 10 == 0:
-                print(f'\n\nPred checkpoint at epoch: {epoch} -> steps: {total_train_steps} ---> \n{pred_text}')
+            #print('TARGET TEXT: ', target_text[0:2])
+            #print('PRED TEXT: ', pred_text[0:2])
 
             pbar.update(1)
-            pbar.set_postfix_str(f'B_WER: {error:0.3f} -> T_WER: {final_wer:0.3f}')
+            #pbar.set_postfix_str(f'B_WER:{error:0.3f} T_WER:{final_wer:0.3f} Loss: {total_loss:0.3f}')
+            pbar.set_postfix_str(f'WER: {final_wer:0.3f} -> Loss: {total_loss:0.3f}')
 
-    if epoch % 5 == 0:
-        print(f'\n\n\nPred Text of last batch at epoch {epoch} --> {pred_text}')
+    print(f'Epoch {epoch} final stats: Loss --> {total_loss:0.5f} WER --> {final_wer:0.5f}\n')
 
-        torch.save(model.state_dict(), f'dev_wav2vec_model_{epoch}.pt')
+    model_wer = final_wer
+
+    if model_wer > model_best_wer:
+        torch.save(model.state_dict(), 'wav2vec2_best_model.pt')
+
+        if epoch == 1:
+            print('This model has been saved!\n')
+        else:
+            print('This model out-performed previous models and has been saved!\n')
+
+        model_best_wer = model_wer
 
 

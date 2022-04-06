@@ -21,19 +21,29 @@ import librosa
 from datasets import Dataset, load_metric
 
 
+# define model variables
+batch_size = 8
+num_epochs = 5
+learning_rate = 0.00001
+sr = 16000
+
+
 # load in librispeech dev mappings, create full_path column
-librispeech = pd.read_csv('../speech_paths/librispeech_dev_mappings.csv')
+librispeech = pd.read_csv('../speech_paths/librispeech_train_mappings.csv')
 librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
 librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
 
+test = librispeech[0:5000]
+librispeech_ds = Dataset.from_pandas(test)
+
 # transform dataset to a HuggingFace Dataset
-librispeech_ds = Dataset.from_pandas(librispeech)
+#librispeech_ds = Dataset.from_pandas(librispeech)
 print(librispeech_ds)
 
 
 # load in the audio file with sampling_rate = 16 kHz
 def load_file(audio_file):
-    waveform, sampling_rate = librosa.load(audio_file, sr=16000)
+    waveform, sampling_rate = librosa.load(audio_file, sr=sr)
 
     return waveform, sampling_rate
 
@@ -53,13 +63,21 @@ def remove_chars(batch):
 librispeech_ds = librispeech_ds.map(remove_chars)
 
 
+# get pretrained Wav2Vec2 processor and model
+processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").cuda()
+#model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+
+
 # function to extract waveform from audio, tokenize audio, and get input values for model
 def prepare_dataset(batch):
-    waveform_array, sampling_rate = librosa.load(batch['full_audio_path'], sr=16000)
+    waveform_array, sampling_rate = librosa.load(batch['full_audio_path'], sr=sr)
 
+    #batch['input_values'] = processor(waveform_array, sampling_rate=sampling_rate).input_values[0].cuda()
     batch['input_values'] = processor(waveform_array, sampling_rate=sampling_rate).input_values[0]
 
     with processor.as_target_processor():
+        #batch['labels'] = processor(batch['text_translation']).input_ids.cuda()
         batch['labels'] = processor(batch['text_translation']).input_ids
 
     return batch
@@ -123,8 +141,10 @@ def compute_metrics(pred):
 
     pred.label_ids[pred.label_ids == -100] = processor.tokenizer.pad_token_id
 
-    pred_str = processor.batch_decode(pred_ids)
+    #pred_str = processor.batch_decode(pred_ids).cpu()
+    #label_str = processor.batch_decode(pred.label_ids, group_tokens=False).cpu()
 
+    pred_str = processor.batch_decode(pred_ids)
     label_str = processor.batch_decode(pred.label_ids, group_tokens=False)
 
     wer = wer_metric.compute(predictions=pred_str, references=label_str)
@@ -132,9 +152,9 @@ def compute_metrics(pred):
     return {'wer': wer}
 
 
-# get pretrained Wav2Vec2 processor and model
+"""# get pretrained Wav2Vec2 processor and model
 processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").cuda()"""
 data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
 
 # use this for number of models to save:
@@ -144,9 +164,9 @@ data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
 training_args = TrainingArguments(
     output_dir='librispeech_pretrained_models',
     group_by_length=True,
-    per_device_train_batch_size=4,
+    per_device_train_batch_size=batch_size,
     evaluation_strategy='steps',
-    num_train_epochs=2,
+    num_train_epochs=num_epochs,
     gradient_checkpointing=True,
     save_steps=200,
     eval_steps=200,
@@ -172,3 +192,4 @@ trainer.train()
 
 # save best model at the end
 trainer.save_model(output_dir='librispeech_pretrained_models')
+
