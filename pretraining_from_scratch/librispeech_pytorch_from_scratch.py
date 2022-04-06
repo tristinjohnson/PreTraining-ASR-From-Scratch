@@ -264,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=2, help='batch size')
     parser.add_argument('--num_epochs', default=50, help='number of epochs for training')
     parser.add_argument('--path_to_csv', required=True, help='full path to your CSV file')
-    parser.add_argument('--num_training_samples', required=True, help='number of samples for training: either any number from 0-23580 or all (all is full LibriSpeech training)')
+    parser.add_argument('--num_training_samples', required=True, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
     args = parser.parse_args()
 
     # load in librispeech dev mappings, create full_path column
