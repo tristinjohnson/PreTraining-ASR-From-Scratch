@@ -22,11 +22,13 @@ The script takes two arguments when compiling:
 
 The training file only works when reading metadata about the audio files from a CSV file. In order to create this CSV file, simply run the 'generate_audio_paths_excel.py' script in the 'generate_audio_mappings' directory with the following arguments:
 
-    1. --path
-    2. --csv_name
+    python3 generate_audio_paths_excel.py --path /path/to/data/dir --csv_name CSV_NAME
     
-1. Provide the full path to the data directory where the data is stored. EX: '--path /home/ubuntu/project/Data/LibriSpeech/dev-clean'
-2. Provide any name you would like the CSV file to be named. It is recommended you name the CSV file based on whichever split you download from the previous step with the '.csv' extension at the end. EX: if you download 'train-clean-100', name your file something like 'librispeech_train_100.csv'
+    # example
+    python3 generate_audio_paths_excel.py --path /home/ubuntu/project/Data/LibriSpeech/train-clean-100 --csv_name librispeech_train_100.csv
+    
+1. --path: Provide the full path to the data directory where the data is stored. EX: '--path /home/ubuntu/project/Data/LibriSpeech/dev-clean'
+2. --csv_name: Provide any name you would like the CSV file to be named. It is recommended you name the CSV file based on whichever split you download from the previous step with the '.csv' extension at the end. EX: if you download 'train-clean-100', name your file something like 'librispeech_train_100.csv'
 
 After running the script, the CSV file will be saved in the same directory as the 'generate_audio_paths_excel.py'
 
@@ -35,13 +37,14 @@ After running the script, the CSV file will be saved in the same directory as th
 
 Once you have successfully completed the previous two steps, you can now begin pretraining Wav2Vec2.0 from scratch using PyTorch. In order to start pretraining, you can run the 'librispeech_pytorch_from_scratch.py' script in the 'pretraining_from_scratch' directory with the following arguments:
 
-    1. --batch_size
-    2. --num_epochs
-    3. --path_to_csv
-    4. --num_training_samples
+    python3 librispeech_pytorch_from_scratch.py --batch_size BATCH_SIZE --num_epochs NUM_EPOCHS --path_to_csv FULL_PATH_TO_CSV --num_training_samples NUM_TRAINING_SAMPLES
     
-1. Define batch size
-2. Define number of epochs
-3. provide full path to your CSV file generated in the previous step
-4. Define number of training samples. This parameter was made in order to cut down the size of training for computation reasons. If you are using the 'train-clean-100' dataset, you can provide any number from 0 to 28530 or provide 'all' for the full training split. EX. '--num_training_samples 500' will provide only 500 audio files for training. 
+    # example
+    python3 librispeech_pytorch_from_scratch.py --batch_size 16 --num_epochs 50 --path_to_csv /your/path/to/csv/file --num_training_samples 10000
+
+    
+1. --batch_size: Define batch size
+2. --num_epochs: Define number of epochs
+3. --path_to_csv: provide full path to your CSV file generated in the previous step
+4. --num_training_samples: Define number of training samples. This parameter was made in order to cut down the size of training for computation reasons. If you are using the 'train-clean-100' dataset, you can provide any number from 0 to 28530 or provide 'all' for the full training split. EX. '--num_training_samples 500' will provide only 500 audio files for training. 
 
