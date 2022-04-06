@@ -9,11 +9,13 @@ In order to download LibriSpeech from OpenSLR.org, you can simply run the 'downl
 
 The script takes two arguments when compiling:
 
-    1. --data_dir_name
-    2. --split
+    python3 download_librispeech.py --data_dir_name DATA_DIR_NAME --split SPLIT
     
-1. The name of the folder in which to download LibriSpeech. EX: '--data_dir_name Data' will create a directory called Data and download all the files in there
-2. The split of LibriSpeech you would like to download. The available splits are 'dev', 'train-clean-100', 'train-clean-360', and 'test'. It is recommened to initially download 'train-clean-100' first, which is 100 hours of LibriSpeech cleaned audio. 
+    # example
+    python3 download_librispeech.py --data_dir_name Data --split train-clean-100
+    
+1. --data_dir_name: The name of the folder in which to download LibriSpeech. EX: '--data_dir_name Data' will create a directory called Data and download all the files in there
+2. --split: The split of LibriSpeech you would like to download. The available splits are 'dev', 'train-clean-100', 'train-clean-360', and 'test'. It is recommened to initially download 'train-clean-100' first, which is 100 hours of LibriSpeech cleaned audio. 
 
 
 ## Generate CSV File with Audio Metadata and Mappings to Audio Files
