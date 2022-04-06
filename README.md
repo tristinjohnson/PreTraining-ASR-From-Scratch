@@ -38,5 +38,8 @@ Once you have successfully completed the previous two steps, you can now begin p
     3. --path_to_csv
     4. --num_training_samples
     
-1. 
+1. Define batch size
+2. Define number of epochs
+3. provide full path to your CSV file generated in the previous step
+4. Define number of training samples. This parameter was made in order to cut down the size of training for computation reasons. If you are using the 'train-clean-100' dataset, you can provide any number from 0 to 28530 or provide 'all' for the full training split. EX. '--num_training_samples 500' will provide only 500 audio files for training. 
 
