@@ -1,3 +1,10 @@
+"""
+Tristin Johnson
+May 2nd, 2022
+
+Pre-training Wav2Vec2.0 on LibriSpeech using custom functions and methods including:
+Data Pre-processing, PyTorch DataSet/DataLoader, vocab file, data collator, PyTorch training loop
+"""
 # import various python packages
 import pandas as pd
 import re
@@ -6,7 +13,6 @@ from transformers import Wav2Vec2Config
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from datasets import Dataset as HF_dataset
-from sklearn.model_selection import train_test_split
 from jiwer import wer
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
@@ -267,7 +273,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=2, help='batch size')
     parser.add_argument('--num_epochs', default=50, help='number of epochs for training')
     parser.add_argument('--path_to_csv', default='../generate_audio_mappings/librispeech_train_mappings.csv', help='full path to your CSV file')
-    parser.add_argument('--num_training_samples', default=50, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
+    parser.add_argument('--num_training_samples', default=200, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
     args = parser.parse_args()
 
     # load in librispeech dev mappings, create full_path column

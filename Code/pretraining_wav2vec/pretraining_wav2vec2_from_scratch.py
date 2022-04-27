@@ -2,7 +2,8 @@
 Tristin Johnson
 May 2nd, 2022
 
-Pre-raining Wav2Vec2 on LibriSpeech dataset.
+Pre-raining Wav2Vec2 on LibriSpeech dataset using custom functions and methods including:
+Data Pre-processing, PyTorch DataSet/DataLoader, vocab file, data collator
 This script uses the built-in HuggingFace training package.
 """
 import pandas as pd
