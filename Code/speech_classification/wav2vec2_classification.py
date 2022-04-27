@@ -1,7 +1,15 @@
+"""
+Tristin Johnson
+May 2nd, 2022
+
+Script to train and test the fine-tuned Wav2Vec2 model on a speech classification dataset
+by adding a classification head to the model.
+"""
+# import various python packages
 import torch
 from torch import nn
 from transformers import Wav2Vec2Processor, AutoConfig
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union, Tuple
@@ -10,14 +18,13 @@ import librosa
 from tqdm import tqdm
 from torch.nn import CrossEntropyLoss
 from transformers.models.wav2vec2.modeling_wav2vec2 import Wav2Vec2PreTrainedModel, Wav2Vec2Model
-import os
 import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
 
 # define training parameters
-batch_size = 16
+batch_size = 2
 num_epochs = 50
 learning_rate = 0.00001
 
@@ -163,11 +170,13 @@ class CustomWav2VecSpeechClassification(Wav2Vec2PreTrainedModel):
 
 
 # train the model
-def train_wav2vec2(model, optimizer, criterion, emotion_ds):
+def train_and_test_wav2vec2(model, optimizer, criterion, training_ds, testing_ds):
 
     # send model to device and put in training mode
     model.to(device)
     model.train()
+
+    model_best_acc = 0
 
     # train the model
     for epoch in range(1, num_epochs + 1):
@@ -176,9 +185,9 @@ def train_wav2vec2(model, optimizer, criterion, emotion_ds):
         train_loss, train_steps = 0, 0
         corr_pred_train, total_pred_train = 0, 0
 
-        with tqdm(total=len(emotion_ds), desc=f'Epoch {epoch}') as pbar:
+        with tqdm(total=len(training_ds), desc=f'Training -> Epoch {epoch}') as pbar:
 
-            for data in emotion_ds:
+            for data in training_ds:
                 # put target and input values on device
                 input_values = data['input_values'].to(device)
                 target = data['labels'].type(torch.LongTensor).to(device)
@@ -207,8 +216,62 @@ def train_wav2vec2(model, optimizer, criterion, emotion_ds):
                 pbar.update(1)
                 pbar.set_postfix_str(f'Loss: {total_train_loss:0.4f}, Acc: {train_acc:0.5f}')
 
+        # put model in evaluation model
+        model.eval()
+
+        test_loss, test_steps = 0, 0
+        corr_pred_test, total_pred_test = 0, 0
+
+        with torch.no_grad():
+            with tqdm(total=len(testing_ds), desc=f'Testing -> Epoch {epoch}') as pbar:
+                for data in testing_ds:
+                    # put target and input values on device
+                    input_values = data['input_values'].to(device)
+                    target = data['labels'].type(torch.LongTensor).to(device)
+
+                    optimizer.zero_grad()
+                    output = model(input_values).logits
+                    loss = criterion(output, target)
+
+                    test_loss += loss.item()
+                    test_steps += 1
+
+                    # make prediction
+                    pred = torch.argmax(output, dim=1)
+
+                    # calculate num correct
+                    corr_pred_test += (pred == target).sum().item()
+                    total_pred_test += pred.shape[0]
+
+                    # calculate accuracy and loss
+                    test_acc = corr_pred_test / total_pred_test
+                    total_test_loss = test_loss / test_steps
+
+                    pbar.update(1)
+                    pbar.set_postfix_str(f'Loss: {total_test_loss:0.4f}, Acc: {test_acc:0.5f}')
+
+        epoch_acc = test_acc
+
+        # if accuracy is better than previous accuracy, save the model
+        if epoch_acc > model_best_acc:
+            torch.save(model.state_dict(), 'best_classification_model.pt')
+            print('\nYour model has been saved!\n')
+            model_best_acc = epoch_acc
+
+        else:
+            print('\nThis model did not out-perform precious model accuracy!\n')
+
+    print('\nTraining and testing is complete!!\n')
+
 
 if __name__ == '__main__':
+
+    # define arguments for script
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_path', default='facebook/wav2vec2-base-960h', help='full path to config.json file')
+    parser.add_argument('--model_path', default='facebook/wav2vec2-base-960h', help='full path to model')
+    args = parser.parse_args()
+
     # read in emotional dataset from .CSV file generated in 'generate_audio_paths.excel'
     emotion_data = pd.read_csv('emotional_data_mappings.csv')
     emotion_data = emotion_data[['audio_name', 'audio_path', 'audio_type', 'emotion']]
@@ -216,13 +279,13 @@ if __name__ == '__main__':
     emotion_data['emotion'] = emotion_data['emotion'] - 1
 
     # shorter length of data for testing purposes
-    short = emotion_data[0:300]
+    short = emotion_data[0:40]
 
     # define pooling mode: 'mean', 'max', 'min'
     pooling_mode = 'mean'
 
     # get config from Wav2Vec2 Base
-    config = AutoConfig.from_pretrained('/home/ubuntu/capstone/wav2vec2/finetuning_wav2vec/timit_small_wav2vec/config.json',
+    config = AutoConfig.from_pretrained(args.config_path,
                                         num_labels=num_labels,
                                         finetuning_task='wav2vec2_clf',
                                         label2id={label: i for i, label in enumerate(label_list)},
@@ -231,8 +294,7 @@ if __name__ == '__main__':
 
     # Define Wav2Vec2 Processor and Model
     processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-    #model = CustomWav2VecSpeechClassification.from_pretrained('facebook/wav2vec2-base-960h', config=config)
-    model = CustomWav2VecSpeechClassification.from_pretrained('/home/ubuntu/capstone/wav2vec2/finetuning_wav2vec/timit_small_wav2vec/pytorch_model.bin', config=config)
+    model = CustomWav2VecSpeechClassification.from_pretrained(args.model_path, config=config)
 
     # call custom Data Collator
     data_collator = DataCollatorCTCWithPadding(processor=processor)
@@ -241,11 +303,19 @@ if __name__ == '__main__':
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     criterion = CrossEntropyLoss()
 
-    # put emotion dataset into PyTorch DataLoader
+    # get custom torch DataSet
     ds_emotion = EmotionalDS(short)
-    loader_emotion = DataLoader(ds_emotion, batch_size=batch_size, shuffle=False, collate_fn=data_collator, num_workers=8)
 
-    # train the model
-    train_wav2vec2(model, optimizer, criterion, loader_emotion)
+    # split into training and testing
+    train_len = round(len(ds_emotion) * 0.8)
+    test_len = round(len(ds_emotion) * 0.2)
 
+    train_ds, test_ds = random_split(ds_emotion, [train_len, test_len])
+
+    # put data into torch DataLoader
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator, num_workers=8)
+    test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator, num_workers=8)
+
+    # train and test the model
+    train_and_test_wav2vec2(model, optimizer, criterion, train_loader, test_loader)
 
