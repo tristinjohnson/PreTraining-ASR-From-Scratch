@@ -1,13 +1,18 @@
-import random
+"""
+Tristin Johnson
+May 2nd, 2022
+
+Pre-raining Wav2Vec2 on LibriSpeech dataset.
+This script uses the built-in HuggingFace training package.
+"""
 import pandas as pd
 import numpy as np
 import re
 import json
-from transformers import Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2ForCTC
-from transformers import Wav2Vec2Config, Wav2Vec2Model
+from transformers import Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2Processor
+from transformers import Wav2Vec2Config, Wav2Vec2ForCTC
 from transformers import Trainer, TrainingArguments
 import torch
-from torch.utils.data import Dataset as TorchDataSet
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 import librosa
@@ -15,10 +20,12 @@ from datasets import Dataset, load_metric
 
 
 # load in librispeech dev mappings, create full_path column
-librispeech = pd.read_csv('speech_paths/librispeech_dev_mappings.csv')
+librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
 librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
 librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
 #librispeech = librispeech.drop(librispeech.index[len(librispeech)-1])
+
+librispeech = librispeech[0:500]
 
 # transform dataset to a HuggingFace Dataset
 librispeech_ds = Dataset.from_pandas(librispeech)
@@ -30,24 +37,6 @@ def load_file(audio_file):
     waveform, sampling_rate = librosa.load(audio_file, sr=16000)
 
     return waveform, sampling_rate
-
-
-"""class LibriSpeechDS(TorchDataSet):
-    def __init__(self, data):
-        self.data = data
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        audio_path = self.data['full_audio_path'][index]
-        audio_name = self.data['audio'][index]
-        flac_array, sampling_rate = load_file(audio_path)
-        text = self.data['text_translation'][index]
-
-        audio_dict = {'array': flac_array, 'path': audio_path, 'sampling_rate': sampling_rate}
-
-        return audio_name, audio_dict, text"""
 
 
 # define list of chars to ignore in text
@@ -86,17 +75,24 @@ vocab_dict["|"] = vocab_dict[" "]
 del vocab_dict[" "]
 
 # add [UNK] and [PAD] to vocab (needed for Wav2Vec2)
-vocab_dict["[UNK]"] = len(vocab_dict)
-vocab_dict['[PAD]'] = len(vocab_dict)
+vocab_dict["J"] = len(vocab_dict)
+vocab_dict["Q"] = len(vocab_dict)
+vocab_dict["X"] = len(vocab_dict)
+vocab_dict["Z"] = len(vocab_dict)
+vocab_dict["<unk>"] = len(vocab_dict)
+vocab_dict["<pad>"] = len(vocab_dict)
+vocab_dict["<s>"] = len(vocab_dict)
+vocab_dict["</s>"] = len(vocab_dict)
+vocab_dict["'"] = len(vocab_dict)
 print(vocab_dict)
 print(len(vocab_dict))
 
 # save the vocab file
-with open('librispeech_vocab.json', 'w') as vocab_file:
+with open('../vocab/vocab_librispeech.json', 'w') as vocab_file:
     json.dump(vocab_dict, vocab_file)
 
 # load Wav2Vec2 tokenizer with custom vocab, create feature extractor, implement processor (combination of tokenizer and feature extractor)
-tokenizer = Wav2Vec2CTCTokenizer('vocab/vocab_librispeech.json', unk_token="[UNK]", pad_token="[PAD]", word_delimiter_token="|")
+tokenizer = Wav2Vec2CTCTokenizer('../vocab/vocab_librispeech.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
 feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
 processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 

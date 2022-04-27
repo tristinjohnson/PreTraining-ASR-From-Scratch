@@ -26,7 +26,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-batch_size = 10  # 2
+batch_size = 32  # 2
 learning_rate = 0.00001
 num_epochs = 20
 
@@ -145,7 +145,7 @@ class DataCollatorCTCWithPadding:
 processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
 model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").cuda()
 
-model_config = model.config.to_json_file('wav2vec_config.json')
+#model_config = model.config.to_json_file('wav2vec_config.json')
 #with open('wav2vec2_config.json', 'w') as config:
     #json.dump(model.config, config)
 

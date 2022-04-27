@@ -17,15 +17,6 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-
-"""# load in librispeech dev mappings, create full_path column
-librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
-librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
-librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
-
-test = librispeech[0:200]"""
-
-
 # load raw audio file with sampling_rate = 16kHz
 def load_file(audio_file):
     waveform, sampling_rate = librosa.load(audio_file, sr=16000)
@@ -83,23 +74,6 @@ def create_custom_vocab(dataset):
         json.dump(vocab_dict, vocab_file)
 
     print('Custom vocab has been created and saved in this directory as \'custom_librispeech_vocab.json\'')
-
-
-#create_custom_vocab(librispeech)
-
-
-
-"""# load Wav2Vec2 tokenizer with custom vocab, create feature extractor, implement processor
-tokenizer = Wav2Vec2CTCTokenizer('../vocab/custom_librispeech_vocab.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
-feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
-processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
-
-# load Wav2Vec2 Config and Model
-#config = Wav2Vec2Config().from_pretrained('../pretraining_from_model/wav2vec_config.json')
-config = Wav2Vec2Config()
-model = Wav2Vec2ForCTC(config).cuda()
-
-model.config.architectures = ["Wav2Vec2ForCTC"]"""
 
 
 # function to extract waveform from audio, tokenize audio, and get input values for model
@@ -182,20 +156,6 @@ class DataCollatorCTCWithPadding:
         return batch
 
 
-"""# get data collator with Padding
-data_collator = DataCollatorCTCWithPadding(processor=processor)
-
-# load raw dataset into PyTorch DataLoader
-#ds_librispeech = LibriSpeechDS(librispeech)
-ds_librispeech = LibriSpeechDS(test)
-loader_libirspeech = DataLoader(ds_librispeech, batch_size=batch_size, shuffle=False, collate_fn=data_collator)
-
-
-# define optimizer -> AdamW
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-ctc_loss = torch.nn.CTCLoss()"""
-
-
 def train_wav2vec_from_scratch(librispeech_ds, num_epochs, model, optimizer, processor):
     # put model in training mode
     model.train()
@@ -229,10 +189,6 @@ def train_wav2vec_from_scratch(librispeech_ds, num_epochs, model, optimizer, pro
                 target_text = processor.batch_decode(target.cpu())
                 pred_text = processor.batch_decode(pred_ids.cpu())
 
-                #print('\nTARGET TEXT: ', target_text, '\nPREDICTED TEXT: ', pred_text, '\n')
-                #print('Target Text Ex: ', target_text[0])
-                #print('Pred Text Ex: ', pred_text[0])
-
                 # calculate current batch WER
                 batch_error = wer(target_text, pred_text)
                 total_train_steps += 1
@@ -263,8 +219,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', default=2, help='batch size')
     parser.add_argument('--num_epochs', default=50, help='number of epochs for training')
-    parser.add_argument('--path_to_csv', required=True, help='full path to your CSV file')
-    parser.add_argument('--num_training_samples', required=True, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
+    parser.add_argument('--path_to_csv', default='../generate_audio_mappings/librispeech_train_mappings.csv', help='full path to your CSV file')
+    parser.add_argument('--num_training_samples', default=1000, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
     args = parser.parse_args()
 
     # load in librispeech dev mappings, create full_path column
