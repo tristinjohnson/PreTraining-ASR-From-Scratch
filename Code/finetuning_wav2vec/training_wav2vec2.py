@@ -41,7 +41,6 @@ chars_ignore = '[\,?.!-;:\"]'
 
 # function to remove all special characters
 def remove_chars(batch):
-    #batch['text_translation'] = re.sub(chars_ignore, '', str(batch['text_translation']))  # .lower()/ this is for librispeech
     batch['text'] = re.sub(chars_ignore, '', batch['text']).lower()
 
     return batch
@@ -165,10 +164,10 @@ def compute_metrics(pred):
 
 
 # train the model using HuggingFace Trainer
-def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
+def huggingface_trainer(model, data_collator, processor, librispeech_full_ds, output_dir_name):
     # implement training arguments for training
     training_args = TrainingArguments(
-        output_dir='timit_medium_wav2vec',
+        output_dir=output_dir_name,
         group_by_length=True,
         per_device_train_batch_size=batch_size,
         evaluation_strategy='steps',
@@ -197,7 +196,7 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
     trainer.train()
 
     # save best model at the end
-    trainer.save_model(output_dir='timit_medium_wav2vec')
+    trainer.save_model(output_dir=output_dir_name)
 
 
 if __name__ == '__main__':
@@ -220,19 +219,24 @@ if __name__ == '__main__':
     feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
     processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
+    output_dir_name = 'timit_wav2vec2'
+
     # define Wav2Vec2.0 configuration
     if args.model_type == 'full':
         config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
+        output_dir_name = 'timit_full_wav2vec2'
 
     elif args.model_type == 'medium':
         config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
         setattr(config, 'num_hidden_layers', 8)
+        output_dir_name = 'timit_medium_wav2vec2'
 
     elif args.model_type == 'small':
         config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
         setattr(config, 'num_hidden_layers', 8)
         setattr(config, 'num_adaptive_layers', 3)
         setattr(config, 'num_attention_heads', 8)
+        output_dir_name = 'timit_small_wav2vec2'
 
     # define pretrained Wav2Vec2.0 processor and model
     model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h", config=config)
@@ -247,5 +251,5 @@ if __name__ == '__main__':
     data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
 
     # train and validate the model
-    huggingface_trainer(model, data_collator, processor, timit)
+    huggingface_trainer(model, data_collator, processor, timit, output_dir_name)
 
