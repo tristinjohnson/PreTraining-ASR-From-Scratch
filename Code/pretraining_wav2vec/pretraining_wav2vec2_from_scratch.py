@@ -18,13 +18,16 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 import librosa
 from datasets import Dataset, load_metric
+import argparse
+import warnings
+warnings.filterwarnings('ignore')
 
 
-# define training variables
-batch_size = 2
+# define training parameters
+batch_size = 4
 num_epochs = 60
 learning_rate = 0.00001
-sr = 16000
+sampling_rate = 16000
 
 
 # load in the audio file with sampling_rate = 16 kHz
@@ -168,7 +171,7 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
 
     # implement training arguments for training
     training_args = TrainingArguments(
-        output_dir='pretrained_wav2vec_librispeech',
+        output_dir='pretrained_wav2vec2_models',
         group_by_length=True,
         per_device_train_batch_size=batch_size,
         evaluation_strategy='steps',
@@ -188,8 +191,8 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
         data_collator=data_collator,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=librispeech_train_test['train'],
-        eval_dataset=librispeech_train_test['test'],
+        train_dataset=librispeech_full_ds['train'],
+        eval_dataset=librispeech_full_ds['test'],
         tokenizer=processor.feature_extractor
     )
 
@@ -197,16 +200,26 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
     trainer.train()
 
     # save best model at the end
-    trainer.save_model(output_dir='pretrained_wav2vec_librispeech')
+    trainer.save_model(output_dir='pretrained_wav2vec2_models')
 
 
 if __name__ == '__main__':
+
+    # define arguments for training
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path_to_csv', default='../generate_audio_mappings/librispeech_train_mappings.csv', help='full path to metadata .CSV file')
+    parser.add_argument('--num_training_samples', default=10000, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
+    args = parser.parse_args()
+
     # load in librispeech train-360 mappings, create full_path column
-    librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
+    librispeech = pd.read_csv(args.path_to_csv)
     librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
     librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
 
-    librispeech = librispeech[0:500]
+    if args.num_training_samples == 'all':
+        librispeech = librispeech[:]
+    else:
+        librispeech = librispeech[0: int(args.num_training_samples)]
 
     # transform dataset to a HuggingFace Dataset
     librispeech_ds = Dataset.from_pandas(librispeech)
@@ -231,4 +244,3 @@ if __name__ == '__main__':
 
     # train and validate the model
     huggingface_trainer(model, data_collator, processor, librispeech_train_test)
-

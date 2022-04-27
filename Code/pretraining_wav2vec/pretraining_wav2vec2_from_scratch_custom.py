@@ -322,3 +322,4 @@ if __name__ == '__main__':
 
     # train and test the model
     train_and_test_wav2vec_from_scratch(train_loader, test_loader, int(args.num_epochs), model, optimizer, processor)
+
