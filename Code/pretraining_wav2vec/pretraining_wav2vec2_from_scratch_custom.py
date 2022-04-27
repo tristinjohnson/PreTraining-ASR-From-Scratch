@@ -4,8 +4,9 @@ import re
 from transformers import Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Wav2Vec2Config
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from datasets import Dataset as HF_dataset
+from sklearn.model_selection import train_test_split
 from jiwer import wer
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
@@ -56,7 +57,7 @@ def create_custom_vocab(dataset):
     vocab_dict["|"] = vocab_dict[" "]
     del vocab_dict[" "]
 
-    # doesnt include J, Q, X, Z
+    # add missing tokens for Wav2Vec tokenizer
     vocab_dict["J"] = len(vocab_dict)
     vocab_dict["Q"] = len(vocab_dict)
     vocab_dict["X"] = len(vocab_dict)
@@ -70,10 +71,10 @@ def create_custom_vocab(dataset):
     print('Custom Vocab created: ', vocab_dict)
     print('Length of vocab file (should be 32): ', len(vocab_dict))
 
-    with open('./custom_librispeech_vocab.json', 'w') as vocab_file:
+    with open('../vocab/vocab_librispeech.json', 'w') as vocab_file:
         json.dump(vocab_dict, vocab_file)
 
-    print('Custom vocab has been created and saved in this directory as \'custom_librispeech_vocab.json\'')
+    print('Custom vocab has been created and saved in the \'vocab\' directory as \'vocab_librispeech.json\'')
 
 
 # function to extract waveform from audio, tokenize audio, and get input values for model
@@ -156,7 +157,7 @@ class DataCollatorCTCWithPadding:
         return batch
 
 
-def train_wav2vec_from_scratch(librispeech_ds, num_epochs, model, optimizer, processor):
+def train_wav2vec_from_scratch(librispeech_train, librispeech_test, num_epochs, model, optimizer, processor):
     # put model in training mode
     model.train()
 
@@ -165,11 +166,11 @@ def train_wav2vec_from_scratch(librispeech_ds, num_epochs, model, optimizer, pro
     # train the model
     for epoch in range(1, num_epochs + 1):
 
-        batch_wer, total_train_steps = 0, 0
+        train_batch_wer, total_train_steps, train_loss = 0, 0, 0
 
-        with tqdm(total=len(librispeech_ds), desc=f'Epoch {epoch}') as pbar:
+        with tqdm(total=len(librispeech_train), desc=f'Epoch {epoch}') as pbar:
 
-            for data in librispeech_ds:
+            for data in librispeech_train:
                 # send input_values and target labels to GPU
                 input_values = data['input_values'].cuda()
                 target = data['labels'].cuda()
@@ -194,22 +195,64 @@ def train_wav2vec_from_scratch(librispeech_ds, num_epochs, model, optimizer, pro
                 total_train_steps += 1
 
                 # calculate overall WER
-                batch_wer += batch_error
-                total_wer = batch_wer / total_train_steps
-
-                if total_train_steps % 10 == 0:
-                    print(f'\n\nPrediction checkpoint at epoch: {epoch} and steps: {total_train_steps} ---> \n{pred_text}')
+                train_batch_wer += batch_error
+                train_wer = train_batch_wer / total_train_steps
+                train_loss += loss.item()
 
                 pbar.update(1)
-                pbar.set_postfix_str(f'Batch_WER: {batch_error:0.3f} -> Total_WER: {total_wer:0.3f}')
+                pbar.set_postfix_str(f'Loss: {train_loss / total_train_steps:0.3f}, WER: {train_wer:0.3f}')
 
-        current_epoch_wer = total_wer
+        # put model in evaluation mode
+        model.eval()
+
+        test_batch_wer, total_test_steps, test_loss = 0, 0, 0
+
+        # test the model on test split
+        with torch.no_grad():
+            with tqdm(total=len(librispeech_test), desc=f'Epoch {epoch}') as pbar:
+
+                for data in librispeech_test:
+                    input_values = data['input_values'].cuda()
+                    target = data['labels'].cuda()
+
+                    data1 = {'input_values': input_values, 'labels': target}
+
+                    optimizer.zero_grad()
+                    output = model(input_values).logits
+                    loss = model(**data1).loss
+
+                    # get prediction ids
+                    pred_ids = torch.argmax(output, dim=-1)
+
+                    # decode target and prediction
+                    target_text = processor.batch_decode(target.cpu())
+                    pred_text = processor.batch_decode(pred_ids.cpu())
+
+                    # calculate current batch WER
+                    batch_error = wer(target_text, pred_text)
+                    total_test_steps += 1
+
+                    # calculate overall WER
+                    test_batch_wer += batch_error
+                    test_wer = train_batch_wer / total_train_steps
+                    test_loss += loss.item()
+
+                    pbar.update(1)
+                    pbar.set_postfix_str(f'Loss: {test_loss / total_test_steps:0.3f}, WER: {test_wer:0.3f}')
+
+        epoch_wer = test_wer
 
         # if WER is greater than previous WER, save the model
-        if current_epoch_wer > model_best_wer:
+        if epoch_wer > model_best_wer:
 
             torch.save(model.state_dict(), 'best_wav2vec2_model.pt')
-            print('Your model has been saved!!')
+            print('Your model has been saved!!\n')
+            model_best_wer = epoch_wer
+
+        else:
+            print('This model did not out-perform previous WER!\n')
+
+    print('Training and Testing is complete!')
 
 
 # main
@@ -220,11 +263,10 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=2, help='batch size')
     parser.add_argument('--num_epochs', default=50, help='number of epochs for training')
     parser.add_argument('--path_to_csv', default='../generate_audio_mappings/librispeech_train_mappings.csv', help='full path to your CSV file')
-    parser.add_argument('--num_training_samples', default=1000, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
+    parser.add_argument('--num_training_samples', default=50, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
     args = parser.parse_args()
 
     # load in librispeech dev mappings, create full_path column
-    #librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
     librispeech = pd.read_csv(args.path_to_csv)
     librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
     librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
@@ -233,7 +275,7 @@ if __name__ == '__main__':
     create_custom_vocab(librispeech)
 
     # load Wav2Vec2 tokenizer with custom vocab, create feature extractor, implement processor
-    tokenizer = Wav2Vec2CTCTokenizer('./custom_librispeech_vocab.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
+    tokenizer = Wav2Vec2CTCTokenizer('../vocab/vocab_librispeech.json', unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
     feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
     processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
@@ -245,14 +287,21 @@ if __name__ == '__main__':
     # get data collator with Padding
     data_collator = DataCollatorCTCWithPadding(processor=processor)
 
-    # define number of training samples
+    # define number of training samples and get custom torch DataSet
     if args.num_training_samples == 'all':
-        ds_librispeech = LibriSpeechDS(librispeech)
+        librispeech_ds = LibriSpeechDS(librispeech)
     else:
-        ds_librispeech = LibriSpeechDS(librispeech[0: int(args.num_training_samples)])
+        librispeech_ds = LibriSpeechDS(librispeech[0: int(args.num_training_samples)])
+
+    # split into training and testing
+    train_len = round(len(librispeech_ds) * 0.8)
+    test_len = round(len(librispeech_ds) * 0.2)
+
+    train_ds, test_ds = random_split(librispeech_ds, [train_len, test_len])
 
     # load dataset into PyTorch DataLoader
-    loader_libirspeech = DataLoader(ds_librispeech, batch_size=int(args.batch_size), shuffle=False, collate_fn=data_collator)
+    train_loader = DataLoader(train_ds, batch_size=int(args.batch_size), shuffle=False, collate_fn=data_collator)
+    test_loader = DataLoader(test_ds, batch_size=int(args.batch_size), shuffle=False, collate_fn=data_collator)
 
     # define optimizer -> AdamW
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
@@ -261,4 +310,4 @@ if __name__ == '__main__':
     print(f'\nStarting training from scratch using Wav2Vec2 on Librispeech with batch_size: {args.batch_size} '
           f'-> num_epochs: {args.num_epochs} -> num_samples: {args.num_training_samples}\n')
 
-    train_wav2vec_from_scratch(loader_libirspeech, int(args.num_epochs), model, optimizer, processor)
+    train_wav2vec_from_scratch(train_loader, test_loader, int(args.num_epochs), model, optimizer, processor)
