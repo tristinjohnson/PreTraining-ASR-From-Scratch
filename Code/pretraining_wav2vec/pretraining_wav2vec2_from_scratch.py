@@ -26,19 +26,6 @@ learning_rate = 0.00001
 sr = 16000
 
 
-"""# load in librispeech dev mappings, create full_path column
-librispeech = pd.read_csv('../generate_audio_mappings/librispeech_train_mappings.csv')
-librispeech = librispeech[['audio', 'audio_path', 'text_translation']]
-librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
-#librispeech = librispeech.drop(librispeech.index[len(librispeech)-1])
-
-librispeech = librispeech[0:500]
-
-# transform dataset to a HuggingFace Dataset
-librispeech_ds = Dataset.from_pandas(librispeech)
-print(librispeech_ds)"""
-
-
 # load in the audio file with sampling_rate = 16 kHz
 def load_file(audio_file):
     waveform, sampling_rate = librosa.load(audio_file, sr=16000)
@@ -55,10 +42,6 @@ def remove_chars(batch):
     batch['text_translation'] = re.sub(chars_ignore, '', str(batch['text_translation']))  # .lower()
 
     return batch
-
-
-"""# remove special characters from librispeech
-librispeech_ds = librispeech_ds.map(remove_chars)"""
 
 
 # function to extract all characters from the text to create custom vocab
@@ -177,14 +160,6 @@ def compute_metrics(pred):
 
     return {'wer': wer}
 
-
-"""# get Wav2Vec2 Configuration and input into the model
-config = Wav2Vec2Config()
-model = Wav2Vec2ForCTC(config)
-data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)"""
-
-# use this for number of models to save:
-# total steps = (num_training_samples / batch_size) * num_epochs
 
 # train the model using HuggingFace Trainer
 def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
