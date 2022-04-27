@@ -57,7 +57,17 @@ def create_custom_vocab(dataset):
 
     # extract all characters from librispeech
     vocabs = dataset.map(extract_all_chars, batched=True, batch_size=1, keep_in_memory=True)
-    vocab_list = list(set(vocabs['vocab'][0]))
+    all_vocab = vocabs['vocab']
+    vocab_list, temp = [], set()
+
+    for letters in all_vocab:
+        for char in letters:
+            if not char in temp:
+                temp.add(char)
+                vocab_list.append(char)
+
+
+    #vocab_list = list(set(vocabs['vocab'][0]))
 
     # create custom vocab dictionary from librispeech
     vocab_dict = {v: k for k, v in enumerate(vocab_list)}
@@ -68,10 +78,10 @@ def create_custom_vocab(dataset):
     del vocab_dict[" "]
 
     # add missing tokens for Wav2Vec tokenizer
-    vocab_dict["J"] = len(vocab_dict)
-    vocab_dict["Q"] = len(vocab_dict)
-    vocab_dict["X"] = len(vocab_dict)
-    vocab_dict["Z"] = len(vocab_dict)
+    #vocab_dict["J"] = len(vocab_dict)
+    #vocab_dict["Q"] = len(vocab_dict)
+    #vocab_dict["X"] = len(vocab_dict)
+    #vocab_dict["Z"] = len(vocab_dict)
     vocab_dict["<unk>"] = len(vocab_dict)
     vocab_dict["<pad>"] = len(vocab_dict)
     vocab_dict["<s>"] = len(vocab_dict)
@@ -85,7 +95,7 @@ def create_custom_vocab(dataset):
     with open('../vocab/vocab_librispeech.json', 'w') as vocab_file:
         json.dump(vocab_dict, vocab_file)
 
-    print('Custom vocab has been created and saved in the \'vocab\' directory as \'custom_librispeech_vocab.json\'')
+    print('Custom vocab has been created and saved in the \'vocab\' directory as \'vocab_librispeech.json\'')
 
 
 # function to extract waveform from audio, tokenize audio, and get input values for model

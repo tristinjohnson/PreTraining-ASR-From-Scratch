@@ -50,18 +50,27 @@ def create_custom_vocab(dataset):
     librispeech_vocab = HF_dataset.from_pandas(dataset)
 
     vocabs = librispeech_vocab.map(extract_all_chars, batched=True, batch_size=1, keep_in_memory=True)
-    vocabs_list = list(set(vocabs['vocab'][0]))
+    all_vocab = vocabs['vocab']
+    vocab_list, temp = [], set()
 
-    vocab_dict = {v: k for k, v in enumerate(vocabs_list)}
+    for letters in all_vocab:
+        for char in letters:
+            if not char in temp:
+                temp.add(char)
+                vocab_list.append(char)
+
+    #vocabs_list = list(set(vocabs['vocab'][0]))
+
+    vocab_dict = {v: k for k, v in enumerate(vocab_list)}
 
     vocab_dict["|"] = vocab_dict[" "]
     del vocab_dict[" "]
 
     # add missing tokens for Wav2Vec tokenizer
-    vocab_dict["J"] = len(vocab_dict)
-    vocab_dict["Q"] = len(vocab_dict)
-    vocab_dict["X"] = len(vocab_dict)
-    vocab_dict["Z"] = len(vocab_dict)
+    #vocab_dict["J"] = len(vocab_dict)
+    #vocab_dict["Q"] = len(vocab_dict)
+    #vocab_dict["X"] = len(vocab_dict)
+    #vocab_dict["Z"] = len(vocab_dict)
     vocab_dict["<unk>"] = len(vocab_dict)
     vocab_dict["<pad>"] = len(vocab_dict)
     vocab_dict["<s>"] = len(vocab_dict)
