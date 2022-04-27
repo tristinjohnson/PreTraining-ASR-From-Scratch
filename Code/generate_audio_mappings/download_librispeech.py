@@ -1,3 +1,9 @@
+"""
+Tristin Johnson
+May 2nd, 2022
+
+Script to download and install various splits of LibriSpeech.
+"""
 import os
 import argparse
 

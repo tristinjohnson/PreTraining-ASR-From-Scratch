@@ -1,6 +1,6 @@
 """
 Tristin Johnson
-March 25th, 2022
+May 2nd, 2022
 
 Script to generate an excel file with audio metadata (audio name, id, path, text)
 in order to read in audio mappings for customization.
