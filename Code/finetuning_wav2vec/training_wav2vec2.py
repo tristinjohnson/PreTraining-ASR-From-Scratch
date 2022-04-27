@@ -1,7 +1,4 @@
 """
-###############################################################
-THIS IS COMPLETE: REMOVE THIS LINE WHEN UPLOADING TO GITHUB
-###############################################################
 Tristin Johnson
 May 2nd, 2022
 
@@ -11,18 +8,20 @@ This script uses the built-in HuggingFace packages in order to train on the pre-
 # import various python packages
 import numpy as np
 import re
-from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer, AutoConfig
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, AutoConfig
 from transformers import Trainer, TrainingArguments
 import torch
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 import librosa
 from datasets import load_metric, load_dataset
+import json
+import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
 
-# define model variables
+# define training variables
 batch_size = 32
 num_epochs = 60
 learning_rate = 0.00001
@@ -46,6 +45,49 @@ def remove_chars(batch):
     batch['text'] = re.sub(chars_ignore, '', batch['text']).lower()
 
     return batch
+
+
+def extract_all_chars(batch):
+    all_text = " ".join(batch['text'])
+    vocab = list(set(all_text))
+
+    return {"vocab": [vocab], "all_text": [all_text]}
+
+
+def create_custom_vocab(dataset):
+    print('Creating custom vocab from TIMIT! ...')
+
+    # extract all characters from TIMIT and create vocab list
+    vocabs = dataset.map(extract_all_chars, batched=True, batch_size=1, keep_in_memory=True)
+    all_vocab = vocabs['train']['vocab']
+    vocab_list, temp = [], set()
+
+    for letters in all_vocab:
+        for char in letters:
+            if not char in temp:
+                temp.add(char)
+                vocab_list.append(char)
+
+    vocab_dict = {v: k for k, v in enumerate(vocab_list)}
+
+    vocab_dict["|"] = vocab_dict[" "]
+    del vocab_dict[" "]
+
+    # add missing tokens for Wav2Vec tokenizer
+    vocab_dict["<unk>"] = len(vocab_dict)
+    vocab_dict["<pad>"] = len(vocab_dict)
+    vocab_dict["<s>"] = len(vocab_dict)
+    vocab_dict["</s>"] = len(vocab_dict)
+    vocab_dict["'"] = len(vocab_dict)
+
+    print('Custom vocab created: ', vocab_dict)
+    print('Length of vocab file: ', len(vocab_dict))
+
+    # save the vocab file
+    with open('../vocab/vocab_timit.json', 'w') as vocab_file:
+        json.dump(vocab_dict, vocab_file)
+
+    print('Custom vocab has been created and saved in the \'vocab\' directory as \'vocab_timit.json\'')
 
 
 # function to extract waveform from audio, tokenize audio, and get input values for model
@@ -160,19 +202,39 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
 
 if __name__ == '__main__':
 
+    # define arguments for training
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_type', default='full', help='Which model to use -> any of [\'full\', \'medium\', \'small\']')
+    args = parser.parse_args()
+
     # load TIMIT dataset from HuggingFace
     timit = load_dataset('timit_asr')
     timit = timit.remove_columns(['phonetic_detail', 'word_detail', 'dialect_region', 'sentence_type', 'speaker_id', 'id'])
 
     # remove special chars from data
     timit = timit.map(remove_chars)
+    create_custom_vocab(timit)
+
+    #
+    tokenizer = Wav2Vec2CTCTokenizer('../vocab/vocab_timit.json', unk_token='<unk>', pad_token='<pad>', word_delimiter_token="|")
+    feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
+    processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
     # define Wav2Vec2.0 configuration
-    config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
-    setattr(config, 'num_hidden_layers', 10)
+    if args.model_type == 'full':
+        config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
+
+    elif args.model_type == 'medium':
+        config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
+        setattr(config, 'num_hidden_layers', 8)
+
+    elif args.model_type == 'small':
+        config = AutoConfig.from_pretrained('facebook/wav2vec2-base-960h')
+        setattr(config, 'num_hidden_layers', 8)
+        setattr(config, 'num_adaptive_layers', 3)
+        setattr(config, 'num_attention_heads', 8)
 
     # define pretrained Wav2Vec2.0 processor and model
-    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
     model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h", config=config)
 
     # freeze the feature extractor
@@ -186,6 +248,4 @@ if __name__ == '__main__':
 
     # train and validate the model
     huggingface_trainer(model, data_collator, processor, timit)
-
-
 
