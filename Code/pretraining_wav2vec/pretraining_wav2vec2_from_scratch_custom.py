@@ -167,7 +167,7 @@ class DataCollatorCTCWithPadding:
         return batch
 
 
-def train_wav2vec_from_scratch(librispeech_train, librispeech_test, num_epochs, model, optimizer, processor):
+def train_and_test_wav2vec_from_scratch(librispeech_train, librispeech_test, num_epochs, model, optimizer, processor):
     # put model in training mode
     model.train()
 
@@ -270,10 +270,10 @@ if __name__ == '__main__':
 
     # define arguments for training
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', default=2, help='batch size')
+    parser.add_argument('--batch_size', default=32, help='batch size')
     parser.add_argument('--num_epochs', default=50, help='number of epochs for training')
     parser.add_argument('--path_to_csv', default='../generate_audio_mappings/librispeech_train_mappings.csv', help='full path to your CSV file')
-    parser.add_argument('--num_training_samples', default=200, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
+    parser.add_argument('--num_training_samples', default=20000, help='number of samples for training: either any number from 0-28530 or all (all is full LibriSpeech training)')
     args = parser.parse_args()
 
     # load in librispeech dev mappings, create full_path column
@@ -320,4 +320,5 @@ if __name__ == '__main__':
     print(f'\nStarting training from scratch using Wav2Vec2 on Librispeech with batch_size: {args.batch_size} '
           f'-> num_epochs: {args.num_epochs} -> num_samples: {args.num_training_samples}\n')
 
-    train_wav2vec_from_scratch(train_loader, test_loader, int(args.num_epochs), model, optimizer, processor)
+    # train and test the model
+    train_and_test_wav2vec_from_scratch(train_loader, test_loader, int(args.num_epochs), model, optimizer, processor)
