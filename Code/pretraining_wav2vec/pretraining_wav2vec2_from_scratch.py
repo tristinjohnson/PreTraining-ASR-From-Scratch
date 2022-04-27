@@ -55,7 +55,7 @@ def extract_all_chars(batch):
 def create_custom_vocab(dataset):
     print('Creating custom vocab from LibriSpeech! ...')
 
-    # extract all characters from librispeech
+    # extract all characters from librispeech and create vocab list
     vocabs = dataset.map(extract_all_chars, batched=True, batch_size=1, keep_in_memory=True)
     all_vocab = vocabs['vocab']
     vocab_list, temp = [], set()
@@ -66,22 +66,13 @@ def create_custom_vocab(dataset):
                 temp.add(char)
                 vocab_list.append(char)
 
-
-    #vocab_list = list(set(vocabs['vocab'][0]))
-
     # create custom vocab dictionary from librispeech
     vocab_dict = {v: k for k, v in enumerate(vocab_list)}
     print(vocab_dict)
 
-    # replace 'space' char with '|'
+    # replace 'space' char with '|' and add Wav2Vec tokens
     vocab_dict["|"] = vocab_dict[" "]
     del vocab_dict[" "]
-
-    # add missing tokens for Wav2Vec tokenizer
-    #vocab_dict["J"] = len(vocab_dict)
-    #vocab_dict["Q"] = len(vocab_dict)
-    #vocab_dict["X"] = len(vocab_dict)
-    #vocab_dict["Z"] = len(vocab_dict)
     vocab_dict["<unk>"] = len(vocab_dict)
     vocab_dict["<pad>"] = len(vocab_dict)
     vocab_dict["<s>"] = len(vocab_dict)
