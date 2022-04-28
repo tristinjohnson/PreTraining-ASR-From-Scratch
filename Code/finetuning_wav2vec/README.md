@@ -2,6 +2,10 @@
 
 This directory allows you to fine-tune the Wav2Vec2.0 model on the TI-MIT dataset. Furthermore, you have the option to use the original and full Wav2Vec2.0 model, or you can use a medium or small-sized model that I created in order to shrink the size of the model with the idea to decrease training time. 
 
+## TI-MIT Speech Corpus
+
+TI-MIT is an acoustic-phonetic speech corpus to further help with the development of ASR. This dataet includes 360 speakers of 8 different dialects of American English, each reading 10 phonetically rich sentences. The unique part of TI-MIT is the fact that the dataset also comes with the phonemes of each speech recording, meaning a model can be trained using just the phonemes of speech. However, for our purposes, we will be sticking with the textual data to enhance speech recognition. To learn more about TI-MIT, click [HERE](https://catalog.ldc.upenn.edu/LDC93s1).
+
 ## Fine-Tune Wav2Vec2.0 on TI-MIT
 
 The script is simple as all you need to define is the type of model you would like to train. Simply run the 'training_wav2vec2.py' script using the following argument:
