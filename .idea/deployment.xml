@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="ubuntu@34.125.177.226:22" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="ubuntu@34.125.172.159:22" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
-      <paths name="ubuntu@34.125.177.226:22">
+      <paths name="ubuntu@34.125.172.159:22">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/ubuntu/capstone/wav2vec2" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/ubuntu/capstone/wav2vec2" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
