@@ -21,18 +21,18 @@ The script takes two arguments when compiling:
 
 ## Generate CSV File with Audio Metadata and Mappings to Audio Files
 
-The training file only works when reading metadata about the audio files from a CSV file. In order to create this CSV file, simply run the 'generate_audio_paths_excel.py' script in the 'generate_audio_mappings' directory with the following arguments:
+The training file only works when reading metadata about the audio files from a CSV file. In order to create this CSV file, simply run the 'generate_metadata_file.py' script in the 'generate_audio_mappings' directory with the following arguments:
 
-    python3 generate_audio_paths_excel.py --path /path/to/data/dir --csv_name CSV_NAME
+    python3 generate_metadata_file.py --path /path/to/data/dir --csv_name CSV_NAME
     
     # example
-    python3 generate_audio_paths_excel.py --path /home/ubuntu/project/Data/LibriSpeech/train-clean-100 --csv_name librispeech_train_100.csv
+    python3 generate_metadata_file.py --path /home/ubuntu/project/Data/LibriSpeech/train-clean-100 --csv_name librispeech_train_100.csv
     
 1. --path: Provide the full path to the data directory where the data is stored. EX: '--path /home/ubuntu/project/Data/LibriSpeech/dev-clean'
 2. --csv_name: Provide any name you would like the CSV file to be named. It is recommended you name the CSV file based on whichever split you download from the previous step with the '.csv' extension at the end. EX: if you download 'train-clean-100', name your file something like 'librispeech_train_100.csv'
 
-After running the script, the CSV file will be saved in the same directory as the 'generate_audio_paths_excel.py'
+After running the script, the CSV file will be saved in the same directory as the 'generate_metadata_file.py'
 
 ## Start Pre-Training Wav2Vec2.0 from Scratch
 
-Now that you have successfully downloaded and installed LibriSpeech and created the metadata file, you can head over to the 'pretraining_wav2vec' directory to start pretraining the Wav2Vec2.0 on LibriSpeech.
+Now that you have successfully downloaded and installed LibriSpeech and created the metadata file, you can head over to the ['pretraining_wav2vec'](https://github.com/tristinjohnson/PreTraining-ASR-From-Scratch/tree/main/Code/pretraining_wav2vec) directory to start pretraining the Wav2Vec2.0 on LibriSpeech.
