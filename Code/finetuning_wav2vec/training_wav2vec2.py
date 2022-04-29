@@ -223,7 +223,7 @@ if __name__ == '__main__':
     timit = timit.map(remove_chars)
     create_custom_vocab(timit)
 
-    #
+    # create custom Wav2Vec2.0 tokenizer, feature extractor, and processor
     tokenizer = Wav2Vec2CTCTokenizer('../vocab/vocab_timit.json', unk_token='<unk>', pad_token='<pad>', word_delimiter_token="|")
     feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, do_normalize=True, return_attention_mask=False)
     processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
