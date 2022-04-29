@@ -1,0 +1,3 @@
+# Final Research Report
+
+Attached is the final research report that was submitted for the Master's of Science in Data Science at The George Washington University. Feel free to read the report that includes an in-depth analysis of every component that makes up the entire project. From every detail about Wav2Vec2.0, to developing the custom-built methods, to the results, there exists a detailed analysis of every single step.
