@@ -22,7 +22,7 @@ warnings.filterwarnings('ignore')
 
 
 # define training variables
-batch_size = 32
+batch_size = 8
 num_epochs = 60
 learning_rate = 0.00001
 sr = 16000
@@ -91,10 +91,20 @@ def create_custom_vocab(dataset):
 
 # function to extract waveform from audio, tokenize audio, and get input values for model
 def prepare_dataset(batch):
-    audio = batch["audio"]
 
-    # get input values
-    batch["input_values"] = processor(audio["array"], sampling_rate=audio["sampling_rate"]).input_values[0]
+    # if 'audio' exists for TI-MIT data
+    try:
+        audio = batch["audio"]
+
+        # get input values
+        batch["input_values"] = processor(audio["array"], sampling_rate=audio["sampling_rate"]).input_values[0]
+
+    # else manually get input values
+    except Exception:
+        wav, sr = librosa.load(batch['file'])
+
+        # get input values
+        batch["input_values"] = processor(wav, sampling_rate=16000).input_values[0]
 
     # get target values
     with processor.as_target_processor():
@@ -172,7 +182,6 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds, ou
         per_device_train_batch_size=batch_size,
         evaluation_strategy='steps',
         num_train_epochs=num_epochs,
-        gradient_checkpointing=True,
         save_steps=500,
         eval_steps=500,
         logging_steps=500,
