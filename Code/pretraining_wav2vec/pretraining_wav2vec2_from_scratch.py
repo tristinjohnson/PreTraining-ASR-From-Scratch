@@ -176,7 +176,6 @@ def huggingface_trainer(model, data_collator, processor, librispeech_full_ds):
         per_device_train_batch_size=batch_size,
         evaluation_strategy='steps',
         num_train_epochs=num_epochs,
-        gradient_checkpointing=True,
         save_steps=500,
         eval_steps=500,
         logging_steps=500,
