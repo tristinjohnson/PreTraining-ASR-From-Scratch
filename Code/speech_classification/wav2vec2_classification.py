@@ -222,6 +222,7 @@ def train_and_test_wav2vec2(model, optimizer, criterion, training_ds, testing_ds
         test_loss, test_steps = 0, 0
         corr_pred_test, total_pred_test = 0, 0
 
+        # test the model
         with torch.no_grad():
             with tqdm(total=len(testing_ds), desc=f'Testing -> Epoch {epoch}') as pbar:
                 for data in testing_ds:
@@ -278,9 +279,6 @@ if __name__ == '__main__':
     emotion_data['full_audio_path'] = emotion_data['audio_path'] + emotion_data['audio_name']
     emotion_data['emotion'] = emotion_data['emotion'] - 1
 
-    # shorter length of data for testing purposes
-    short = emotion_data[0:40]
-
     # define pooling mode: 'mean', 'max', 'min'
     pooling_mode = 'mean'
 
@@ -304,9 +302,9 @@ if __name__ == '__main__':
     criterion = CrossEntropyLoss()
 
     # get custom torch DataSet
-    ds_emotion = EmotionalDS(short)
+    ds_emotion = EmotionalDS(emotion_data)
 
-    # split into training and testing
+    # split into training and testing (80% training, 20% testing)
     train_len = round(len(ds_emotion) * 0.8)
     test_len = round(len(ds_emotion) * 0.2)
 
