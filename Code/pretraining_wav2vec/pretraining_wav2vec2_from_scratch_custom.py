@@ -51,6 +51,7 @@ def extract_all_chars(batch):
     return {"vocab": [vocab], "all_text": [all_text]}
 
 
+# function to create custom vocab.json on LibriSpeech data
 def create_custom_vocab(dataset):
     print('Creating custom vocab from Librispeech! ...')
     librispeech_vocab = HF_dataset.from_pandas(dataset)
@@ -167,6 +168,7 @@ class DataCollatorCTCWithPadding:
         return batch
 
 
+# function using PyTorch training loop to train and test the model
 def train_and_test_wav2vec_from_scratch(librispeech_train, librispeech_test, num_epochs, model, optimizer, processor):
     # put model in training mode
     model.train()

@@ -56,6 +56,7 @@ def extract_all_chars(batch):
     return {"vocab": [vocab], "all_text": [all_text]}
 
 
+# function to create custom vocab.json file for LibriSpeech
 def create_custom_vocab(dataset):
     print('Creating custom vocab from LibriSpeech! ...')
 
@@ -216,7 +217,7 @@ if __name__ == '__main__':
     librispeech['full_audio_path'] = librispeech['audio_path'] + librispeech['audio']
 
     if args.num_training_samples == 'all':
-        librispeech = librispeech[:]
+        librispeech = librispeech[0:]
     else:
         librispeech = librispeech[0: int(args.num_training_samples)]
 
