@@ -46,6 +46,7 @@ def remove_chars(batch):
     return batch
 
 
+# function to extract all chars from TI-MIT
 def extract_all_chars(batch):
     all_text = " ".join(batch['text'])
     vocab = list(set(all_text))
@@ -53,6 +54,7 @@ def extract_all_chars(batch):
     return {"vocab": [vocab], "all_text": [all_text]}
 
 
+# function to create custom vocab.json file for TI-MIT
 def create_custom_vocab(dataset):
     print('Creating custom vocab from TIMIT! ...')
 
