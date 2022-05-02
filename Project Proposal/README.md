@@ -1,0 +1,3 @@
+# Automatic Speech Recognition Project Proposal
+
+Here, is the initial project proposal that was submitted for the Master's of Science in Data Science Capstone course. This project proposal was accepted by the lead professor the Data Science course, and was used as a guideline throughout the entire project. Feel free to take a look at the project proposal above to compare the progress and results against the report and the presentation.
