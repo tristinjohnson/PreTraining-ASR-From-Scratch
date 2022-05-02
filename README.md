@@ -42,7 +42,7 @@ The results of the speech classification dataset on RAVDESS were much more promi
 
 ## Project Repository
 
-This repository is split up into 3 different sections: 
+This repository is split up into 4 different sections: 
 
 1) **Code:** This directory includes all of the code that makes up the entire research project, all with instructions on how to recreate the results above with some flexibility in creating your own models. To see how the details of the code directory and how to run each piece, click [HERE](https://github.com/tristinjohnson/PreTraining-ASR-From-Scratch/tree/main/Code).
 
@@ -51,5 +51,8 @@ This repository is split up into 3 different sections:
 
 
 3) **Final Research Presentation:** This directory contains the presentation that was used to conclude the Master's of Science in Data Science degree. This presentation provides a birds-eye-view of the entire project that highlights the important details throughout the research project, which can be seen [HERE](https://github.com/tristinjohnson/PreTraining-ASR-From-Scratch/tree/main/Final%20Research%20Presentation).
+
+
+4) **Research Proposal:** This directory contains the initial project proposal that was submitted for acceptance by the department of Data Science, and was a qualified proposal that led to the creation of this research project and repository. To view the proposal, click [HERE](https://github.com/tristinjohnson/PreTraining-ASR-From-Scratch/tree/main/Project%20Proposal).
 
 Feel free to explore any of the sections above, as there is a lot of information that can be learned from this project. Furthermore, other researcher's out there have the ability to re-create this project and even add their own twist to try and compete with the results above. 
